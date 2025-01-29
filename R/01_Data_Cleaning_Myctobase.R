@@ -1,15 +1,15 @@
-require(dplyr)
-
 # read-in data -----------------------------------------------------------------
 
-raw_data   = read.csv(here::here("Data/Myctobase/individualOccurrence.csv")) # individual occurrence records
+raw_data   = read.csv(here::here("Data/Myctobase/groupOccurrence.csv")) # individual occurrence records
 event_data = read.csv(here::here("Data/Myctobase/event.csv")) # sampling metadata
 
 # merging datasets -------------------------------------------------------------
 # extract date from sampling metadata and add to individual occurrence records
 
+require(dplyr)
+
 merged_data      = left_join(raw_data, event_data, by = "eventID")
-merged_data$date = as.Date(strsplit(merged_data$start_eventTime, " ")  %>% sapply("[[", 1), format = "%d/%m/%y")
+merged_data$date = as.Date(strsplit(merged_data$start_eventTime, " ")  %>% sapply("[[", 1), format = "%d/%m/%Y")
 merged_data$year = as.numeric(format(merged_data$date, "%Y"))
 
 # keep only species records

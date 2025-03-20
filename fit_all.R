@@ -201,8 +201,6 @@ plot_sigmas(fit = fit_unexp, legend_coord = c(0.85, 0.85))
 ggsave("non_exploited_sigmas.pdf", path = plot_directory, width = 7.5, height = 2.6)
 
 
-
-
 # 2. EXPLOITED SPECIES (RAM + PELGAS)
 preds_exp = fit_exp$summary(variables = "pred", ~ quantile(.x, probs = c(0.5, 0.1, 0.9)))
 
@@ -231,8 +229,10 @@ plot_sigmas(fit = fit_exp, legend_coord = c(0.25, 0.85))
 ggsave("exploited_sigmas.pdf", path = plot_directory, width = 7.5, height = 2.6)
 
 
-
-
+# Export model predictions as .csv files ---------------------------------------
+export_path = file.path(here::here(), "Data", "MARSS_outputs/")
+write.csv(preds_unexp, file = paste0(export_path, "predictions_unexploited.csv"))
+write.csv(preds_exp,   file = paste0(export_path, "predictions_exploited.csv"))
 
 
 

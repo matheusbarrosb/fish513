@@ -22,8 +22,7 @@ unexp_data = read.csv(here::here("Data/Myctobase/myctobase_clean.csv"))
 constant   = 1e-10 # avoids NaNs
 unexp_data = unexp_data %>%
   group_by(year) %>%
-  summarise(obs = sum(-log(n_m3+constant), na.rm = TRUE),
-            n)
+  summarise(obs = sum(-log(n_m3+constant), na.rm = TRUE))
 
 # fix random NA
 unexp_data[length(unexp_data$year),1] = 2018
@@ -104,13 +103,14 @@ data_list_unexp = list(
 )
 
 # 2. EXPLOITED SPECIES (RAM + PELGAS)
-exp_mean = mean(exp_data$obs, na.rm = TRUE)
+
+#exp_mean = mean(exp_data$obs, na.rm = TRUE)
 
 data_list_exp = list(
   N            = length(unique(exp_data$year)),             # 56 years of data
   S            = 1,                                         # 1 single time series  
   M            = 1,                                        
-  y            = exp_data$obs/exp_mean,                            # observations
+  y            = exp_data$obs,                            # observations
   states       = 1:1,
   n_obsvar     = 1,
   proVariances = c(1,0),
@@ -205,9 +205,14 @@ ggsave("non_exploited_sigmas.pdf", path = plot_directory, width = 7.5, height = 
 preds_exp = fit_exp$summary(variables = "pred", ~ quantile(.x, probs = c(0.5, 0.1, 0.9)))
 
 preds_exp$year = exp_data$year
-preds_exp$obs  = exp_data$obs/exp_mean
+preds_exp$obs  = exp_data$obs
 
 names(preds_exp) = c("par", "mean", "low", "upp", "year", "obs")
+
+# de-scale data
+#preds_exp$mean = preds_exp$mean*exp_mean
+#preds_exp$low  = preds_exp$low*exp_mean
+#preds_exp$upp  = preds_exp$upp*exp_mean
 
 preds_exp %>%
   ggplot() +
@@ -218,10 +223,10 @@ preds_exp %>%
   theme(strip.text.x = element_text(face = "italic"),
         legend.position = "top",
         legend.title = element_blank()) +
-  ylim(0,2.5) +
+#  ylim(0,2.5) +
   ggtitle("Exploited pelagics") +
   xlab("Year") +
-  ylab("Scaled biomass")
+  ylab("Biomass (mt)")
 
 ggsave("exploited_trend.pdf", path = plot_directory, width = 5, height = 3)
 
@@ -234,6 +239,72 @@ export_path = file.path(here::here(), "Data", "MARSS_outputs/")
 write.csv(preds_unexp, file = paste0(export_path, "predictions_unexploited.csv"))
 write.csv(preds_exp,   file = paste0(export_path, "predictions_exploited.csv"))
 
+
+# What fraction of small pelagics catch in the RAM database? -------------------
+
+# load FAO global database
+fao_catches = as.data.frame(read_csv(here::here("Data/FAO_catches.csv")))
+fao_catches = fao_catches %>% select(-contains("Flag"))
+fao_catches = fao_catches %>%
+  pivot_longer(cols = -1, names_to = "year", values_to = "catch") %>%
+  group_by(year) %>%
+  filter(year %in% c(1960:2015)) %>%
+  summarise(catch = sum(catch, na.rm = TRUE))
+
+# load RAM database catch data  
+catches = read.csv(here::here("Data/RAM/catches.csv"))
+
+exp_catch = catches %>%
+  left_join(stock2, by = "stockid") %>%
+  filter(scientificname %in% taxonomy$scientificname)
+
+exp_catch = exp_catch %>%
+  filter(year %in% c(1960:2015)) %>%
+  group_by(year) %>%
+  summarise(catch = sum(TCbest, na.rm = TRUE))
+
+
+exp_catch %>%
+  ggplot(aes(x = year, y = catch)) +
+  geom_line() +
+  geom_point() +
+  custom_theme() +
+  ylab("Catch (mt)") +
+  xlab("Year") +
+  ggtitle("RAM database catch data")
+
+fao_catches %>%
+  ggplot(aes(x = as.numeric(year), y = catch)) +
+  geom_line() +
+  geom_point() +
+  custom_theme() +
+  ylab("Catch (mt)") +
+  xlab("Year") +
+  ggtitle("FAO global catch data")
+
+catch_all = data.frame(year = exp_catch$year,
+                       ramCatch = exp_catch$catch,
+                       totalCatch = fao_catches$catch,
+                       ramFraction = exp_catch$catch/fao_catches$catch)
+
+write.csv(catch_all, file = paste0(export_path, "catch_fraction.csv"))
+
+
+catch_all %>%
+  ggplot(aes(x = year, y = ramFraction)) +
+  geom_line() +
+  geom_point() +
+  custom_theme() +
+  ylab("% represented in RAM") +
+  xlab("Year") +
+  ggtitle("Fraction of small pelagics catch in RAM data") +
+  annotate(geom = "text", x = 1970, y = 0.7,
+           label = paste0("Mean = ",round(mean(catch_all$ramFraction, na.rm = TRUE)*100,0), "%, sd = ",
+                          round(sd(catch_all$ramFraction, na.rm = TRUE)*100,0), "%"))
+
+ggsave("RAM_catch_fraction.pdf", path = plot_directory, width = 5, height = 3)
+
+  
 
 
 
